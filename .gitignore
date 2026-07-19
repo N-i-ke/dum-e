@@ -1,1 +1,4 @@
 persona/Modelfile
+data/
+__pycache__/
+*.pyc
