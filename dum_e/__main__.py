@@ -35,7 +35,7 @@ def main() -> None:
                 break
             if not user_input:
                 continue
-            if user_input in ("/bye", "/quit", "exit"):
+            if user_input == "/bye":
                 break
             if user_input == "/new":
                 session_id = memory.new_session()

@@ -1,3 +1,4 @@
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -52,7 +53,7 @@ class MemoryTest(unittest.TestCase):
 
     def test_rejects_unknown_role(self):
         sid = self.memory.new_session()
-        with self.assertRaises(Exception):
+        with self.assertRaises(sqlite3.IntegrityError):
             self.memory.add(sid, "system", "不正なロール")
 
 
