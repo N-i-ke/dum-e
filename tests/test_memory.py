@@ -51,6 +51,18 @@ class MemoryTest(unittest.TestCase):
         self.memory.add(sid1, "user", "セッション1の発言")
         self.assertEqual(self.memory.recent(sid2), [])
 
+    def test_add_flag_and_list(self):
+        sid = self.memory.new_session()
+        self.memory.add_flag(sid, "日本語が崩れた", "user: 質問\nassistant: 崩れた応答")
+        flags = self.memory.flags()
+        self.assertEqual(len(flags), 1)
+        flag_id, created_at, reason, context = flags[0]
+        self.assertEqual(reason, "日本語が崩れた")
+        self.assertIn("崩れた応答", context)
+
+    def test_flags_empty_by_default(self):
+        self.assertEqual(self.memory.flags(), [])
+
     def test_rejects_unknown_role(self):
         sid = self.memory.new_session()
         with self.assertRaises(sqlite3.IntegrityError):

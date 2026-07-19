@@ -19,6 +19,13 @@ CREATE TABLE IF NOT EXISTS messages (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, id);
+CREATE TABLE IF NOT EXISTS flags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES sessions(id),
+    reason TEXT NOT NULL,
+    context TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -65,6 +72,21 @@ class Memory:
             (session_id, limit),
         ).fetchall()
         return [{"role": role, "content": content} for role, content in rows]
+
+    def add_flag(self, session_id: int, reason: str, context: str = "") -> None:
+        """モデルや記憶の不足事例を記録する。Phase 2・3 導入の判断材料。"""
+        self.conn.execute(
+            "INSERT INTO flags (session_id, reason, context, created_at)"
+            " VALUES (?, ?, ?, ?)",
+            (session_id, reason, context, _now()),
+        )
+        self.conn.commit()
+
+    def flags(self) -> list[tuple]:
+        """記録済みの不足事例を (id, created_at, reason, context) で返す。"""
+        return self.conn.execute(
+            "SELECT id, created_at, reason, context FROM flags ORDER BY id"
+        ).fetchall()
 
     def close(self) -> None:
         self.conn.close()

@@ -9,7 +9,18 @@ from .memory import Memory
 # モデルに渡す直近メッセージ数。コンテキスト長と応答速度の均衡点
 HISTORY_WINDOW = 20
 
-USAGE = "/new: 新規セッション  /bye: 終了"
+USAGE = "/new: 新規セッション  /flag <理由>: 不足の記録  /bye: 終了"
+
+
+def show_flags(memory: Memory) -> None:
+    rows = memory.flags()
+    if not rows:
+        print("dum-e: 記録された不足事例はありません")
+        return
+    for flag_id, created_at, reason, context in rows:
+        print(f"[{flag_id}] {created_at}  {reason}")
+        for line in context.splitlines():
+            print(f"    {line}")
 
 
 def main() -> None:
@@ -20,9 +31,16 @@ def main() -> None:
         "--new", action="store_true", help="履歴を引き継がず新規セッションで開始する"
     )
     parser.add_argument("--model", default=DEFAULT_MODEL, help="使用する Ollama モデル")
+    parser.add_argument(
+        "--flags", action="store_true", help="記録済みの不足事例を一覧して終了する"
+    )
     args = parser.parse_args()
 
     memory = Memory()
+    if args.flags:
+        show_flags(memory)
+        memory.close()
+        return
     session_id = memory.new_session() if args.new else memory.resume_or_create_session()
     print(f"dum-e: session {session_id} ({USAGE})")
 
@@ -40,6 +58,19 @@ def main() -> None:
             if user_input == "/new":
                 session_id = memory.new_session()
                 print(f"dum-e: 新規セッション {session_id} を開始しました")
+                continue
+            if user_input.startswith("/flag"):
+                reason = user_input.removeprefix("/flag").strip()
+                if not reason:
+                    print("dum-e: 理由を添えてください(例: /flag 日本語が崩れた)")
+                    continue
+                # 不足が起きた証拠として直前の往復を添える
+                context = "\n".join(
+                    f"{m['role']}: {m['content']}"
+                    for m in memory.recent(session_id, 2)
+                )
+                memory.add_flag(session_id, reason, context)
+                print("dum-e: 不足事例を記録しました(--flags で一覧)")
                 continue
 
             messages = memory.recent(session_id, HISTORY_WINDOW)
