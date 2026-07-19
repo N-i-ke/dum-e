@@ -17,18 +17,20 @@ def chat_stream(
     messages: list[dict],
     model: str = DEFAULT_MODEL,
     host: str = OLLAMA_HOST,
-) -> Iterator[str]:
-    """メッセージ列を送信し、応答テキストを断片単位で yield する。
+    think: bool = False,
+) -> Iterator[tuple[str, str]]:
+    """メッセージ列を送信し、("thinking" | "content", テキスト断片) を yield する。
 
     人格はモデル(jarvis-local)側に焼き込み済みのため、
     system メッセージはここでは付与しない。
+    qwen3 の思考モードは既定で無効(応答前の長考で体感速度を落とすため)。
+    推論が必要な質問では think=True で精度を優先できる。
     """
     payload = {
         "model": model,
         "messages": messages,
         "stream": True,
-        # qwen3 の思考モードは応答前の長考で体感速度を落とすため無効化する
-        "think": False,
+        "think": think,
     }
     req = urllib.request.Request(
         f"{host}/api/chat",
@@ -41,9 +43,11 @@ def chat_stream(
                 chunk = json.loads(line)
                 if chunk.get("error"):
                     raise OllamaError(chunk["error"])
-                content = chunk.get("message", {}).get("content", "")
-                if content:
-                    yield content
+                message = chunk.get("message", {})
+                if thinking := message.get("thinking", ""):
+                    yield "thinking", thinking
+                if content := message.get("content", ""):
+                    yield "content", content
                 if chunk.get("done"):
                     return
     except urllib.error.HTTPError as e:

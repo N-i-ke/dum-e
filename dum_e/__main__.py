@@ -9,7 +9,13 @@ from .memory import Memory
 # モデルに渡す直近メッセージ数。コンテキスト長と応答速度の均衡点
 HISTORY_WINDOW = 20
 
-USAGE = "/new: 新規セッション  /flag <理由>: 不足の記録  /bye: 終了"
+USAGE = (
+    "/new: 新規セッション  /think <質問>: 思考モード  "
+    "/flag <理由>: 不足の記録  /bye: 終了"
+)
+
+DIM = "\033[2m"
+RESET = "\033[0m"
 
 
 def show_flags(memory: Memory) -> None:
@@ -59,7 +65,7 @@ def main() -> None:
                 session_id = memory.new_session()
                 print(f"dum-e: 新規セッション {session_id} を開始しました")
                 continue
-            if user_input.startswith("/flag"):
+            if user_input == "/flag" or user_input.startswith("/flag "):
                 reason = user_input.removeprefix("/flag").strip()
                 if not reason:
                     print("dum-e: 理由を添えてください(例: /flag 日本語が崩れた)")
@@ -73,17 +79,42 @@ def main() -> None:
                 print("dum-e: 不足事例を記録しました(--flags で一覧)")
                 continue
 
+            think = False
+            if user_input == "/think" or user_input.startswith("/think "):
+                think = True
+                user_input = user_input.removeprefix("/think").strip()
+                if not user_input:
+                    print("dum-e: 質問を添えてください(例: /think この設計の弱点は？)")
+                    continue
+
             messages = memory.recent(session_id, HISTORY_WINDOW)
             messages.append({"role": "user", "content": user_input})
 
             reply_parts: list[str] = []
+            in_thinking = False
             try:
-                for part in chat_stream(messages, model=args.model):
-                    print(part, end="", flush=True)
-                    reply_parts.append(part)
+                for kind, part in chat_stream(
+                    messages, model=args.model, think=think
+                ):
+                    if kind == "thinking":
+                        # 思考過程は薄色で表示し、履歴には残さない
+                        if not in_thinking:
+                            print(DIM, end="")
+                            in_thinking = True
+                        print(part, end="", flush=True)
+                    else:
+                        if in_thinking:
+                            print(RESET)
+                            in_thinking = False
+                        print(part, end="", flush=True)
+                        reply_parts.append(part)
             except OllamaError as e:
+                if in_thinking:
+                    print(RESET, end="")
                 print(f"\ndum-e: {e}", file=sys.stderr)
                 continue
+            if in_thinking:
+                print(RESET, end="")
             print()
 
             # 応答が完了した往復のみ記憶する(失敗した呼び出しで履歴を汚さない)
