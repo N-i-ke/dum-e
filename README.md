@@ -64,15 +64,29 @@ flowchart TD
 brew install ollama
 brew services start ollama
 
-# 2. ベースモデルをダウンロードする(8bit 量子化、約 16GB)
-ollama pull qwen3:14b-q8_0
+# 2. 機体の RAM に応じたベースモデルをダウンロードする(下の表を参照)
+ollama pull qwen3:14b-q8_0   # RAM 32GB 以上(standard)
+ollama pull qwen3:14b        # RAM 16GB(lite)
 
 # 3. 人格を焼き込んだモデル jarvis-local を生成する
+#    搭載 RAM からプロファイルが自動選択される
 ./persona/build.sh
 
 # 4. 生成を確認する(jarvis-local が一覧に出れば完了)
 ollama list
 ```
+
+### 機体別プロファイル
+
+| プロファイル | 対象 | ベースモデル | num_ctx | 明示指定 |
+|---|---|---|---|---|
+| `standard` | RAM 32GB 以上 | `qwen3:14b-q8_0`(約 16GB) | 16384 | `./persona/build.sh --profile standard` |
+| `lite` | RAM 16GB | `qwen3:14b`(4bit、約 9GB) | 8192 | `./persona/build.sh --profile lite` |
+| `lite-alt` | lite でも重い機体 | `qwen3:8b`(約 5GB) | 8192 | `./persona/build.sh --profile lite-alt` |
+
+`./persona/build.sh` は搭載 RAM から自動選択するが、`--profile` で明示的に切り替えられる。
+どのプロファイルでも生成されるモデル名は `jarvis-local` で、人格(`persona/JARVIS.md`)と
+会話履歴(`data/memory.db`)は共通。Python 側の変更は不要。
 
 ## 起動方法
 
